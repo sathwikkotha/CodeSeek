@@ -1,0 +1,103 @@
+[
+  {"question": "How does HTTP basic authentication work in this client?", "repo": "httpx", "path": "httpx/_auth.py", "symbol_name": "BasicAuth"},
+  {"question": "How is HTTP digest authentication implemented?", "repo": "httpx", "path": "httpx/_auth.py", "symbol_name": "DigestAuth"},
+  {"question": "Where are connection and read timeouts configured?", "repo": "httpx", "path": "httpx/_config.py", "symbol_name": "Timeout"},
+  {"question": "How does the client decide whether a redirect crosses origins?", "repo": "httpx", "path": "httpx/_client.py", "symbol_name": "_same_origin"},
+  {"question": "How are gzip-compressed responses decoded?", "repo": "httpx", "path": "httpx/_decoders.py", "symbol_name": "GZipDecoder"},
+  {"question": "How is brotli decompression handled?", "repo": "httpx", "path": "httpx/_decoders.py", "symbol_name": "BrotliDecoder"},
+  {"question": "Where is a connection timeout error defined?", "repo": "httpx", "path": "httpx/_exceptions.py", "symbol_name": "ConnectTimeout"},
+  {"question": "Where is the too-many-redirects error raised from?", "repo": "httpx", "path": "httpx/_exceptions.py", "symbol_name": "TooManyRedirects"},
+  {"question": "How is multipart form data encoded for a request?", "repo": "httpx", "path": "httpx/_content.py", "symbol_name": "encode_multipart_data"},
+  {"question": "Where is a JSON request body serialized?", "repo": "httpx", "path": "httpx/_content.py", "symbol_name": "encode_json"},
+  {"question": "How does the command-line tool print response headers?", "repo": "httpx", "path": "httpx/_main.py", "symbol_name": "print_response_headers"},
+  {"question": "Where is a raw URL string parsed into its components?", "repo": "httpx", "path": "httpx/_urlparse.py", "symbol_name": "urlparse"},
+  {"question": "How are cookies represented and merged?", "repo": "httpx", "path": "httpx/_models.py", "symbol_name": "Cookies"},
+  {"question": "How is the WSGI transport implemented for testing without a real server?", "repo": "httpx", "path": "httpx/_transports/wsgi.py", "symbol_name": "WSGITransport"},
+  {"question": "Where is the HTTP status code enum defined?", "repo": "httpx", "path": "httpx/_status_codes.py", "symbol_name": "codes"},
+  {"question": "How is a command-line progress bar implemented?", "repo": "click", "path": "src/click/_termui_impl.py", "symbol_name": "ProgressBar"},
+  {"question": "Where is a yes/no confirmation prompt implemented?", "repo": "click", "path": "src/click/termui.py", "symbol_name": "confirm"},
+  {"question": "How does click parse raw command-line arguments into option values?", "repo": "click", "path": "src/click/parser.py", "symbol_name": "_OptionParser"},
+  {"question": "Where is shell tab-completion implemented for bash?", "repo": "click", "path": "src/click/shell_completion.py", "symbol_name": "BashComplete"},
+  {"question": "How are invalid parameter values reported back to the user?", "repo": "click", "path": "src/click/exceptions.py", "symbol_name": "BadParameter"},
+  {"question": "Where is a missing required option detected and reported?", "repo": "click", "path": "src/click/exceptions.py", "symbol_name": "MissingParameter"},
+  {"question": "How is ANSI color styling applied to terminal output text?", "repo": "click", "path": "src/click/termui.py", "symbol_name": "style"},
+  {"question": "Where is a filesystem path command-line parameter type validated?", "repo": "click", "path": "src/click/types.py", "symbol_name": "Path"},
+  {"question": "How does click group multiple subcommands under one CLI?", "repo": "click", "path": "src/click/core.py", "symbol_name": "Group"},
+  {"question": "Where is the in-process test runner that invokes CLI commands for testing?", "repo": "click", "path": "src/click/testing.py", "symbol_name": "CliRunner"},
+
+  {"question": "Where is the main FastAPI application class defined?", "repo": "fastapi", "path": "fastapi/applications.py", "symbol_name": "FastAPI"},
+  {"question": "Where is a Python object converted into JSON-serializable data?", "repo": "fastapi", "path": "fastapi/encoders.py", "symbol_name": "jsonable_encoder"},
+  {"question": "Where are background tasks scheduled to run after a response is sent?", "repo": "fastapi", "path": "fastapi/background.py", "symbol_name": "BackgroundTasks"},
+
+  {"question": "How can a validator run after Pydantic's own field validation?", "repo": "pydantic", "path": "pydantic/functional_validators.py", "symbol_name": "AfterValidator"},
+  {"question": "Where is the base error raised when a user misuses the Pydantic API?", "repo": "pydantic", "path": "pydantic/errors.py", "symbol_name": "PydanticUserError"},
+  {"question": "How does Pydantic represent and parse a color value?", "repo": "pydantic", "path": "pydantic/color.py", "symbol_name": "Color"},
+
+  {"question": "How is HTTP digest authentication implemented in the requests library?", "repo": "requests", "path": "src/requests/auth.py", "symbol_name": "HTTPDigestAuth"},
+  {"question": "Where does requests define the default transport adapter for a session?", "repo": "requests", "path": "src/requests/adapters.py", "symbol_name": "HTTPAdapter"},
+  {"question": "Where is the too-many-redirects error defined in requests?", "repo": "requests", "path": "src/requests/exceptions.py", "symbol_name": "TooManyRedirects"},
+
+  {"question": "Where is the main Flask application class defined?", "repo": "flask", "path": "src/flask/app.py", "symbol_name": "Flask"},
+  {"question": "How does Flask decide how sessions are opened and saved?", "repo": "flask", "path": "src/flask/sessions.py", "symbol_name": "SessionInterface"},
+  {"question": "Where does the Flask CLI figure out which app object to run?", "repo": "flask", "path": "src/flask/cli.py", "symbol_name": "ScriptInfo"},
+
+  {"question": "How does rich horizontally or vertically align renderable content?", "repo": "rich", "path": "rich/align.py", "symbol_name": "Align"},
+  {"question": "Where is the main terminal output object in rich?", "repo": "rich", "path": "rich/console.py", "symbol_name": "Console"},
+
+  {"question": "How does black decide whether a comment attaches to the code above or below it?", "repo": "black", "path": "src/black/comments.py", "symbol_name": "generate_comments"},
+  {"question": "How does black represent a parsed comment before formatting it?", "repo": "black", "path": "src/black/comments.py", "symbol_name": "ProtoComment"},
+
+  {"question": "What error does attrs raise when you try to mutate a frozen instance?", "repo": "attrs", "path": "src/attr/exceptions.py", "symbol_name": "FrozenInstanceError"},
+  {"question": "How does attrs let you plug in a custom comparison function for a class?", "repo": "attrs", "path": "src/attr/_cmp.py", "symbol_name": "cmp_using"},
+
+  {"question": "Where is the base Starlette ASGI application class defined?", "repo": "starlette", "path": "starlette/applications.py", "symbol_name": "Starlette"},
+  {"question": "How does Starlette return a JSON response?", "repo": "starlette", "path": "starlette/responses.py", "symbol_name": "JSONResponse"},
+  {"question": "Where does Starlette run tasks after a response has been sent?", "repo": "starlette", "path": "starlette/background.py", "symbol_name": "BackgroundTasks"},
+
+  {"question": "How does httpie customize the HTTP transport adapter it uses?", "repo": "httpie", "path": "httpie/adapters.py", "symbol_name": "HTTPieHTTPAdapter"},
+  {"question": "How does httpie represent multiple values for the same HTTP header?", "repo": "httpie", "path": "httpie/cli/dicts.py", "symbol_name": "HTTPHeadersDict"},
+
+  {"question": "How does sqlmodel represent metadata about a model field?", "repo": "sqlmodel", "path": "sqlmodel/main.py", "symbol_name": "FieldInfo"},
+  {"question": "How does sqlmodel represent metadata about a relationship between models?", "repo": "sqlmodel", "path": "sqlmodel/main.py", "symbol_name": "RelationshipInfo"},
+
+  {"question": "Where are uvicorn's server settings like host, port, and workers configured?", "repo": "uvicorn", "path": "uvicorn/config.py", "symbol_name": "Config"},
+  {"question": "Where is the main uvicorn server class that runs the event loop?", "repo": "uvicorn", "path": "uvicorn/server.py", "symbol_name": "Server"},
+
+  {"question": "Where does poetry-core build a Poetry project object from pyproject.toml?", "repo": "poetry-core", "path": "src/poetry/core/factory.py", "symbol_name": "Factory"},
+  {"question": "How does poetry-core interact with a project's git repository?", "repo": "poetry-core", "path": "src/poetry/core/vcs/git.py", "symbol_name": "Git"},
+
+  {"question": "Where is the core Axios request class implemented?", "repo": "axios", "path": "lib/core/Axios.js", "symbol_name": "Axios"},
+  {"question": "How does axios let you cancel an in-flight request?", "repo": "axios", "path": "lib/cancel/CancelToken.js", "symbol_name": "CancelToken"},
+  {"question": "How does axios bind a function to a fixed 'this' context?", "repo": "axios", "path": "lib/helpers/bind.js", "symbol_name": "bind"},
+
+  {"question": "Where does express construct a new application instance?", "repo": "express", "path": "lib/express.js", "symbol_name": "createApplication"},
+  {"question": "How does express represent a template view to be rendered?", "repo": "express", "path": "lib/view.js", "symbol_name": "View"},
+
+  {"question": "Where does lodash's documentation site build process live?", "repo": "lodash", "path": "lib/main/build-site.js", "symbol_name": "build"},
+  {"question": "How does lodash's build tooling turn plain links into hyperlinks in docs?", "repo": "lodash", "path": "lib/main/build-site.js", "symbol_name": "autoLink"},
+
+  {"question": "Where is the main Chalk class that applies terminal text styling?", "repo": "chalk", "path": "source/index.js", "symbol_name": "Chalk"},
+  {"question": "How does chalk efficiently replace every occurrence of a substring?", "repo": "chalk", "path": "source/utilities.js", "symbol_name": "stringReplaceAll"},
+
+  {"question": "Where is the main Command class for defining a CLI command?", "repo": "commander.js", "path": "lib/command.js", "symbol_name": "Command"},
+  {"question": "How does commander represent a single CLI option?", "repo": "commander.js", "path": "lib/option.js", "symbol_name": "Option"},
+  {"question": "How does commander represent a positional CLI argument?", "repo": "commander.js", "path": "lib/argument.js", "symbol_name": "Argument"},
+
+  {"question": "Where is the main Dayjs date object class implemented?", "repo": "dayjs", "path": "src/index.js", "symbol_name": "Dayjs"},
+  {"question": "How does dayjs check whether a value is already a Dayjs instance?", "repo": "dayjs", "path": "src/index.js", "symbol_name": "isDayjs"},
+
+  {"question": "How do you register a custom error message map in zod?", "repo": "zod", "path": "packages/zod/src/v3/errors.ts", "symbol_name": "setErrorMap"},
+  {"question": "How do you retrieve the currently active error map in zod?", "repo": "zod", "path": "packages/zod/src/v3/errors.ts", "symbol_name": "getErrorMap"},
+
+  {"question": "Where does yargs generate shell completion suggestions?", "repo": "yargs", "path": "lib/completion.ts", "symbol_name": "Completion"},
+  {"question": "Where does yargs track the currently executing command instance?", "repo": "yargs", "path": "lib/command.ts", "symbol_name": "CommandInstance"},
+  {"question": "How does yargs manage global middleware functions across commands?", "repo": "yargs", "path": "lib/middleware.ts", "symbol_name": "GlobalMiddleware"},
+
+  {"question": "How does koa store request-scoped state across async boundaries?", "repo": "koa", "path": "lib/application.js", "symbol_name": "getAsyncLocalStorage"},
+  {"question": "Where does koa decide how to send the final response body?", "repo": "koa", "path": "lib/application.js", "symbol_name": "respond"},
+  {"question": "How does koa parse a comma-separated request header value into a list?", "repo": "koa", "path": "lib/request.js", "symbol_name": "splitCommaSeparatedValues"},
+
+  {"question": "How does nanoid generate a random ID using a custom alphabet?", "repo": "nanoid", "path": "index.js", "symbol_name": "customAlphabet"},
+  {"question": "How does nanoid generate a random ID using a custom random number generator?", "repo": "nanoid", "path": "index.js", "symbol_name": "customRandom"},
+  {"question": "Where does nanoid generate the raw random bytes for an ID?", "repo": "nanoid", "path": "index.js", "symbol_name": "random"}
+]

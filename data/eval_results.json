@@ -1,0 +1,16 @@
+[
+  {
+    "model_key": "general",
+    "recall_at_5": 0.28,
+    "recall_at_10": 0.32,
+    "mrr": 0.20800000000000002,
+    "num_questions": 25
+  },
+  {
+    "model_key": "code",
+    "recall_at_5": 0.28,
+    "recall_at_10": 0.28,
+    "mrr": 0.16133333333333333,
+    "num_questions": 25
+  }
+]

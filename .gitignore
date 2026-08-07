@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.env
+
+# ingestion output: cloned repos + generated manifests (large, reproducible)
+data/repos/
+data/manifest.jsonl
+data/chunks/
+
+# qdrant local storage
+qdrant_storage/
