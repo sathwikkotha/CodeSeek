@@ -3,15 +3,26 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 ROOT_DIR = Path(__file__).resolve().parents[2]
+
+# Loads OPENAI_API_KEY (and anything else) from a .env file at the project
+# root into the environment -- imported first by every entry point via this
+# module, so this runs before any OpenAI client gets constructed.
+load_dotenv(ROOT_DIR / ".env")
+
 DATA_DIR = ROOT_DIR / "data"
 REPOS_DIR = DATA_DIR / "repos"
 MANIFEST_PATH = DATA_DIR / "manifest.jsonl"
 CHUNKS_DIR = DATA_DIR / "chunks"
 QDRANT_PATH = DATA_DIR / "qdrant_storage"
 
-# All repos are indexed into one shared corpus (one pair of collections,
-# <CORPUS_NAME>__general / <CORPUS_NAME>__code), filterable by repo/language at query time.
+# Every indexed repo lives in one shared Qdrant store (one collection,
+# <CORPUS_NAME>__openai), but retrieval and the explain agent always scope a
+# given question to a single repo via a payload filter -- there is
+# deliberately no more fixed, curated multi-repo corpus. Index whatever repo
+# you want via /ingest; this is just the storage namespace.
 CORPUS_NAME = "codeseek"
 
 
@@ -22,41 +33,63 @@ class RepoSpec:
     language: str  # primary language, used for chunker routing later
 
 
-# Corpus: real, well-known, permissively-licensed repos across Python and
-# JS/TS. Deliberately avoids huge monorepos (django, pytest, nestjs) to keep
-# local CPU-only embedding time bounded.
-CORPUS: list[RepoSpec] = [
-    # Python
-    RepoSpec("fastapi", "https://github.com/fastapi/fastapi.git", "python"),
-    RepoSpec("httpx", "https://github.com/encode/httpx.git", "python"),
-    RepoSpec("pydantic", "https://github.com/pydantic/pydantic.git", "python"),
-    RepoSpec("requests", "https://github.com/psf/requests.git", "python"),
-    RepoSpec("flask", "https://github.com/pallets/flask.git", "python"),
-    RepoSpec("click", "https://github.com/pallets/click.git", "python"),
-    RepoSpec("rich", "https://github.com/Textualize/rich.git", "python"),
-    RepoSpec("black", "https://github.com/psf/black.git", "python"),
-    RepoSpec("attrs", "https://github.com/python-attrs/attrs.git", "python"),
-    RepoSpec("starlette", "https://github.com/encode/starlette.git", "python"),
-    RepoSpec("httpie", "https://github.com/httpie/cli.git", "python"),
-    RepoSpec("sqlmodel", "https://github.com/fastapi/sqlmodel.git", "python"),
-    RepoSpec("uvicorn", "https://github.com/encode/uvicorn.git", "python"),
-    RepoSpec("poetry-core", "https://github.com/python-poetry/poetry-core.git", "python"),
-    # JS/TS
-    RepoSpec("axios", "https://github.com/axios/axios.git", "javascript"),
-    RepoSpec("express", "https://github.com/expressjs/express.git", "javascript"),
-    RepoSpec("lodash", "https://github.com/lodash/lodash.git", "javascript"),
-    RepoSpec("chalk", "https://github.com/chalk/chalk.git", "javascript"),
-    RepoSpec("commander.js", "https://github.com/tj/commander.js.git", "javascript"),
-    RepoSpec("dayjs", "https://github.com/iamkun/dayjs.git", "javascript"),
-    RepoSpec("zod", "https://github.com/colinhacks/zod.git", "typescript"),
-    RepoSpec("yargs", "https://github.com/yargs/yargs.git", "javascript"),
-    RepoSpec("koa", "https://github.com/koajs/koa.git", "javascript"),
-    RepoSpec("nanoid", "https://github.com/ai/nanoid.git", "javascript"),
-]
-
-# File extensions routed to the AST/code chunker vs. the docs chunker.
+# File extensions with a dedicated AST (Python) or tree-sitter (JS/TS) parser
+# -- these get real symbol-level chunking (one chunk per function/class).
 CODE_EXTENSIONS = {".py", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"}
-DOC_EXTENSIONS = {".md", ".rst"}
+DOC_EXTENSIONS = {".md", ".rst", ".txt", ".adoc"}
+NOTEBOOK_EXTENSIONS = {".ipynb"}
+
+# Every other plausible source-code extension: no parser exists for these, so
+# they get line-based generic chunking (real, citeable line ranges, but no
+# symbol extraction) instead of being dropped outright -- this is what makes
+# "index almost any file" true without needing a tree-sitter grammar per
+# language.
+GENERIC_CODE_EXTENSIONS = {
+    ".go", ".rs", ".java", ".kt", ".kts", ".c", ".h", ".cpp", ".cc", ".cxx", ".hpp",
+    ".cs", ".rb", ".php", ".swift", ".scala", ".sh", ".bash", ".zsh", ".ps1",
+    ".sql", ".html", ".htm", ".css", ".scss", ".less", ".yaml", ".yml", ".json",
+    ".toml", ".ini", ".cfg", ".xml", ".proto", ".graphql", ".lua", ".pl", ".r",
+    ".ex", ".exs", ".hs", ".clj", ".dart", ".vue", ".svelte", ".groovy", ".m",
+    ".vb", ".jl", ".nim", ".zig", ".sol",
+}
+
+# Well-known extensionless filenames worth indexing as generic code even
+# though they have no suffix to route on.
+GENERIC_CODE_FILENAMES = {"Dockerfile", "Makefile", "Rakefile", "Gemfile", "Procfile", "Vagrantfile"}
+
+# Friendly language label per generic extension -- used for the `language`
+# payload field (search filtering, syntax highlighting). Falls back to the
+# bare extension name for anything not listed here.
+GENERIC_LANGUAGE_BY_EXTENSION = {
+    ".go": "go", ".rs": "rust", ".java": "java", ".kt": "kotlin", ".kts": "kotlin",
+    ".c": "c", ".h": "c", ".cpp": "cpp", ".cc": "cpp", ".cxx": "cpp", ".hpp": "cpp",
+    ".cs": "csharp", ".rb": "ruby", ".php": "php", ".swift": "swift", ".scala": "scala",
+    ".sh": "shell", ".bash": "shell", ".zsh": "shell", ".ps1": "powershell",
+    ".sql": "sql", ".html": "html", ".htm": "html", ".css": "css", ".scss": "scss",
+    ".less": "less", ".yaml": "yaml", ".yml": "yaml", ".json": "json", ".toml": "toml",
+    ".ini": "ini", ".cfg": "ini", ".xml": "xml", ".proto": "protobuf", ".graphql": "graphql",
+    ".lua": "lua", ".pl": "perl", ".r": "r", ".ex": "elixir", ".exs": "elixir",
+    ".hs": "haskell", ".clj": "clojure", ".dart": "dart", ".vue": "vue", ".svelte": "svelte",
+    ".groovy": "groovy", ".m": "objective-c", ".vb": "vbnet", ".jl": "julia",
+    ".nim": "nim", ".zig": "zig", ".sol": "solidity",
+}
+
+# Binary, generated, or otherwise low-value noise -- skipped even though
+# ingestion is otherwise permissive by default. A denylist, not an allowlist:
+# anything not explicitly recognized above and not matched here still falls
+# through to generic-code or docs chunking rather than being dropped.
+SKIP_EXTENSIONS = {
+    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp", ".bmp", ".tiff",
+    ".mp3", ".mp4", ".wav", ".avi", ".mov", ".webm", ".ogg", ".flac",
+    ".woff", ".woff2", ".ttf", ".otf", ".eot",
+    ".zip", ".tar", ".gz", ".tgz", ".7z", ".rar", ".pyc", ".pyo", ".so", ".dll",
+    ".dylib", ".exe", ".o", ".a", ".class", ".jar", ".whl", ".pdf",
+    ".lock", ".map",
+}
+SKIP_FILENAMES = {
+    "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "poetry.lock",
+    "Cargo.lock", "composer.lock", "Gemfile.lock", "Pipfile.lock",
+}
 
 # Directories skipped entirely while walking a cloned repo.
 IGNORED_DIR_NAMES = {

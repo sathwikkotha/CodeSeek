@@ -1,12 +1,16 @@
-"""Shallow-clones (or updates) each repo in the corpus into data/repos/<name>."""
+"""Shallow-clones (or updates) a repo into data/repos/<name>."""
 
 import logging
 import subprocess
 from pathlib import Path
 
-from codeseek.config import CORPUS, REPOS_DIR, RepoSpec
+from codeseek.config import REPOS_DIR, RepoSpec
 
 logger = logging.getLogger(__name__)
+
+
+def infer_repo_name(url: str) -> str:
+    return url.rstrip("/").rsplit("/", 1)[-1].removesuffix(".git")
 
 
 def clone_or_update(repo: RepoSpec, dest_dir: Path = REPOS_DIR) -> Path:
@@ -28,13 +32,3 @@ def clone_or_update(repo: RepoSpec, dest_dir: Path = REPOS_DIR) -> Path:
         check=True, capture_output=True, text=True,
     )
     return repo_path
-
-
-def clone_all(corpus: list[RepoSpec] = CORPUS, dest_dir: Path = REPOS_DIR) -> list[Path]:
-    paths = []
-    for repo in corpus:
-        try:
-            paths.append(clone_or_update(repo, dest_dir))
-        except subprocess.CalledProcessError as e:
-            logger.error("Failed to clone/update %s: %s", repo.name, e.stderr)
-    return paths

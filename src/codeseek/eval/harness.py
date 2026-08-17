@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from codeseek.embedding.service import EmbeddingService
 from codeseek.eval.ground_truth import GroundTruthItem
 from codeseek.eval.metrics import reciprocal_rank, recall_at_k
-from codeseek.retrieval.hybrid import HybridRetriever
+from codeseek.retrieval.hybrid import HybridRetriever, Reranker
 from codeseek.store.qdrant_store import QdrantStore
 from codeseek.store.schema import collection_name
 
@@ -31,8 +31,17 @@ def _is_relevant(payload: dict, item: GroundTruthItem) -> bool:
     # An oversized function/class is split into "Name#part1", "Name#part2", ...
     # by both chunkers (code_chunker.py, js_ts_chunker.py) -- any part counts
     # as finding the target symbol, not just an exact match on the bare name.
+    # A ground-truth item targeting a class also counts a retrieved method of
+    # that class ("ClassName.method_name[#partN]") as relevant -- since
+    # method-level chunking (code_chunker.py) split classes into an overview
+    # chunk plus one chunk per method, a question about the class is often
+    # best answered by one specific method, not the overview.
     symbol_name = payload.get("symbol_name", "")
-    name_matches = symbol_name == item.symbol_name or symbol_name.startswith(f"{item.symbol_name}#part")
+    name_matches = (
+        symbol_name == item.symbol_name
+        or symbol_name.startswith(f"{item.symbol_name}#part")
+        or symbol_name.startswith(f"{item.symbol_name}.")
+    )
     return payload.get("repo") == item.repo and payload.get("path") == item.path and name_matches
 
 
@@ -43,8 +52,9 @@ def run_eval(
     corpus_name: str,
     model_keys: list[str],
     top_k: int = 10,
+    reranker: Reranker | None = None,
 ) -> list[EvalResult]:
-    retriever = HybridRetriever(store)
+    retriever = HybridRetriever(store, reranker=reranker)
     results: list[EvalResult] = []
 
     for model_key in model_keys:

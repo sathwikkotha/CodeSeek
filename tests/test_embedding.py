@@ -62,14 +62,61 @@ def test_embed_one_cache_evicts_oldest_when_full():
     assert service.cache_hits == 0
 
 
+def test_openai_embedder_uses_injected_client():
+    """OpenAIEmbedder against a fake client -- no network, no cost --
+    verifying the request shape and response-parsing, not the real API."""
+    from codeseek.embedding.openai_embedder import OpenAIEmbedder
+
+    class FakeEmbeddingItem:
+        def __init__(self, embedding):
+            self.embedding = embedding
+
+    class FakeEmbeddingsResponse:
+        def __init__(self, vectors):
+            self.data = [FakeEmbeddingItem(v) for v in vectors]
+
+    class FakeOpenAIClient:
+        def __init__(self):
+            self.calls = []
+            self.embeddings = self
+
+        def create(self, model, input):
+            self.calls.append((model, input))
+            return FakeEmbeddingsResponse([[0.1, 0.2, 0.3] for _ in input])
+
+    fake_client = FakeOpenAIClient()
+    embedder = OpenAIEmbedder(model_name="text-embedding-3-small", client=fake_client)
+
+    vectors = embedder.embed(["def f(): pass", "class C: pass"])
+
+    assert vectors == [[0.1, 0.2, 0.3], [0.1, 0.2, 0.3]]
+    assert fake_client.calls == [("text-embedding-3-small", ["def f(): pass", "class C: pass"])]
+    assert embedder.dimensions == 1536
+
+
+def test_openai_embedder_returns_empty_list_for_empty_input():
+    """The API 400s on an empty input list -- guard against ever sending one."""
+    from codeseek.embedding.openai_embedder import OpenAIEmbedder
+
+    class FailingClient:
+        def __init__(self):
+            self.embeddings = self
+
+        def create(self, model, input):
+            raise AssertionError("should never be called with empty input")
+
+    embedder = OpenAIEmbedder(client=FailingClient())
+    assert embedder.embed([]) == []
+
+
 @pytest.mark.slow
-def test_real_local_models_smoke():
-    """Downloads and runs the two actual local embedding models once, to prove
-    the real pipeline (not the fake) produces sane, differently-shaped vectors."""
-    from codeseek.embedding.registry import CODE, GENERAL, build_default_embedders
+def test_real_openai_embedder_smoke():
+    """Calls the real OpenAI embeddings API once, to prove the actual
+    pipeline (not the fake) produces a sane vector. Costs a fraction of a
+    cent and requires OPENAI_API_KEY."""
+    from codeseek.embedding.registry import OPENAI, build_default_embedders
 
     service = EmbeddingService(build_default_embedders())
     result = service.embed_all(["def add(a, b):\n    return a + b"])
 
-    assert len(result[GENERAL][0]) == 384
-    assert len(result[CODE][0]) == 768
+    assert len(result[OPENAI][0]) == 1536

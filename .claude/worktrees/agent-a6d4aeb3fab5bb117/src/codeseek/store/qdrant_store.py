@@ -1,0 +1,92 @@
+"""Thin wrapper around QdrantClient: collection setup (cosine distance + a
+full-text payload index for keyword-hybrid search), batched upsert, and the
+two raw search primitives the retrieval layer merges."""
+
+from dataclasses import dataclass
+
+from qdrant_client import QdrantClient, models
+
+from codeseek.store.schema import ChunkPayload
+
+
+@dataclass(frozen=True)
+class SearchHit:
+    id: str
+    score: float
+    payload: dict
+
+
+def build_metadata_filter(repo: str | None, language: str | None) -> models.Filter | None:
+    conditions = []
+    if repo:
+        conditions.append(models.FieldCondition(key="repo", match=models.MatchValue(value=repo)))
+    if language:
+        conditions.append(models.FieldCondition(key="language", match=models.MatchValue(value=language)))
+    return models.Filter(must=conditions) if conditions else None
+
+
+class QdrantStore:
+    def __init__(
+        self, path: str | None = None, url: str | None = None, location: str | None = None,
+        timeout: float | None = None,
+    ):
+        """path: on-disk local storage dir (dev default). url: containerized Qdrant
+        (load-test phase). location=':memory:' for ephemeral in-process storage (tests).
+        timeout: seconds before a url-mode request gives up -- a real production
+        knob, not just a test convenience; a hung connection is worse than a fast, clear error."""
+        if url:
+            self._client = QdrantClient(url=url, timeout=timeout)
+        elif path:
+            self._client = QdrantClient(path=path)
+        else:
+            self._client = QdrantClient(location=location or ":memory:")
+
+    def ensure_collection(self, name: str, vector_size: int) -> None:
+        if self._client.collection_exists(name):
+            return
+        self._client.create_collection(
+            collection_name=name,
+            vectors_config=models.VectorParams(size=vector_size, distance=models.Distance.COSINE),
+        )
+        self._client.create_payload_index(
+            collection_name=name, field_name="text", field_schema=models.PayloadSchemaType.TEXT,
+        )
+        self._client.create_payload_index(
+            collection_name=name, field_name="symbol_name", field_schema=models.PayloadSchemaType.TEXT,
+        )
+
+    def upsert_chunks(self, collection: str, chunks: list[ChunkPayload], vectors: list[list[float]]) -> None:
+        points = [
+            models.PointStruct(id=chunk.point_id(), vector=vector, payload=chunk.as_payload_dict())
+            for chunk, vector in zip(chunks, vectors)
+        ]
+        self._client.upsert(collection_name=collection, points=points)
+
+    def vector_search(
+        self, collection: str, query_vector: list[float], limit: int, query_filter: models.Filter | None = None
+    ) -> list[SearchHit]:
+        if not self._client.collection_exists(collection):
+            return []
+        results = self._client.query_points(
+            collection_name=collection, query=query_vector, limit=limit, query_filter=query_filter,
+        )
+        return [SearchHit(id=str(p.id), score=p.score, payload=p.payload or {}) for p in results.points]
+
+    def keyword_search(
+        self, collection: str, query_text: str, limit: int, extra_filter: models.Filter | None = None
+    ) -> list[SearchHit]:
+        """Pure payload filter match, no vector involved -- Qdrant scores filter-only
+        matches as 1.0, which the retrieval layer replaces with the vector floor score."""
+        if not self._client.collection_exists(collection):
+            return []
+        text_filter = models.Filter(
+            should=[
+                models.FieldCondition(key="text", match=models.MatchText(text=query_text)),
+                models.FieldCondition(key="symbol_name", match=models.MatchText(text=query_text)),
+            ]
+        )
+        must = [text_filter, extra_filter] if extra_filter else [text_filter]
+        points, _ = self._client.scroll(
+            collection_name=collection, scroll_filter=models.Filter(must=must), limit=limit,
+        )
+        return [SearchHit(id=str(p.id), score=0.0, payload=p.payload or {}) for p in points]

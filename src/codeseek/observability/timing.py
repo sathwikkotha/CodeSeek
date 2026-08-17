@@ -31,5 +31,13 @@ def timed_stage(stage: str, **fields):
 
 def configure_json_logging(level: int = logging.INFO) -> None:
     """Each stage already emits a JSON string as the log message, so the
-    handler format is just the bare message -- no extra text wrapped around it."""
+    handler format is just the bare message -- no extra text wrapped around it.
+
+    Quiets httpx/urllib3/huggingface_hub, which otherwise log one INFO line
+    per HTTP request (model-loading alone fires dozens against the HF Hub)
+    and bury the actual per-stage progress this exists to surface -- found
+    while debugging what looked like a hung /ingest request but was really
+    just this noise burying the pipeline's own log lines."""
     logging.basicConfig(level=level, format="%(message)s")
+    for noisy in ("httpx", "httpcore", "urllib3", "huggingface_hub", "filelock"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)

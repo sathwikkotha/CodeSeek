@@ -1,12 +1,24 @@
-"""Walks a cloned repo's file tree and routes each file to 'code', 'docs', or skips it."""
+"""Walks a cloned repo's file tree and routes each file to 'code' (AST/tree-
+sitter chunking), 'docs', 'notebook', 'code_generic' (line-based chunking for
+any other plausible source file), or skips it."""
 
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterator, Literal
 
-from codeseek.config import CODE_EXTENSIONS, DOC_EXTENSIONS, IGNORED_DIR_NAMES, NON_ENGLISH_DOC_LOCALES
+from codeseek.config import (
+    CODE_EXTENSIONS,
+    DOC_EXTENSIONS,
+    GENERIC_CODE_EXTENSIONS,
+    GENERIC_CODE_FILENAMES,
+    IGNORED_DIR_NAMES,
+    NON_ENGLISH_DOC_LOCALES,
+    NOTEBOOK_EXTENSIONS,
+    SKIP_EXTENSIONS,
+    SKIP_FILENAMES,
+)
 
-Category = Literal["code", "docs"]
+Category = Literal["code", "docs", "notebook", "code_generic"]
 
 
 @dataclass(frozen=True)
@@ -19,10 +31,19 @@ class FileRecord:
 
 
 def _route(path: Path) -> Category | None:
-    if path.suffix in CODE_EXTENSIONS:
-        return "code"
-    if path.suffix in DOC_EXTENSIONS or path.name.upper().startswith("README"):
+    name = path.name
+    suffix = path.suffix
+
+    if name in SKIP_FILENAMES or suffix in SKIP_EXTENSIONS or name.endswith((".min.js", ".min.css")):
+        return None
+    if suffix in NOTEBOOK_EXTENSIONS:
+        return "notebook"
+    if suffix in DOC_EXTENSIONS or name.upper().startswith("README"):
         return "docs"
+    if suffix in CODE_EXTENSIONS:
+        return "code"
+    if suffix in GENERIC_CODE_EXTENSIONS or name in GENERIC_CODE_FILENAMES:
+        return "code_generic"
     return None
 
 

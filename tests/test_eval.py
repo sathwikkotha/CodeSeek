@@ -40,6 +40,17 @@ def test_is_relevant_matches_oversized_split_parts():
     assert not _is_relevant({"repo": "demo", "path": "b.py", "symbol_name": "DigestAuth#part1"}, item)
 
 
+def test_is_relevant_matches_a_method_of_the_targeted_class():
+    # method-level chunking (code_chunker.py) splits a class into an overview
+    # chunk plus one chunk per method, named "ClassName.method_name" -- a
+    # ground-truth item targeting the class should count either as a hit.
+    item = GroundTruthItem("q", repo="demo", path="a.py", symbol_name="DigestAuth")
+
+    assert _is_relevant({"repo": "demo", "path": "a.py", "symbol_name": "DigestAuth.__init__"}, item)
+    assert _is_relevant({"repo": "demo", "path": "a.py", "symbol_name": "DigestAuth.build_challenge#part1"}, item)
+    assert not _is_relevant({"repo": "demo", "path": "a.py", "symbol_name": "DigestAuthChallenge.method"}, item)
+
+
 class FakeEmbedder:
     """'jwt' -> along x, 'csv' -> along y, anything else -> near-zero (weak match)."""
 

@@ -72,6 +72,52 @@ class QdrantStore:
         )
         return [SearchHit(id=str(p.id), score=p.score, payload=p.payload or {}) for p in results.points]
 
+    def list_repos(self, collection: str, limit: int = 200) -> list[tuple[str, int]]:
+        """Distinct repo names currently stored in `collection`, with point
+        counts -- powers the UI's 'what's actually searchable' list."""
+        if not self._client.collection_exists(collection):
+            return []
+        result = self._client.facet(collection_name=collection, key="repo", limit=limit, exact=True)
+        return [(hit.value, hit.count) for hit in result.hits]
+
+    def delete_repo(self, collection: str, repo: str) -> None:
+        """Remove every point for `repo` from `collection` -- used before a
+        clean re-index (e.g. after a chunker fix) so stale points from the
+        old chunk boundaries don't linger alongside the new ones."""
+        if not self._client.collection_exists(collection):
+            return
+        self._client.delete(
+            collection_name=collection,
+            points_selector=models.FilterSelector(
+                filter=models.Filter(must=[models.FieldCondition(key="repo", match=models.MatchValue(value=repo))])
+            ),
+        )
+
+    def find_by_symbol(self, collection: str, repo: str, name: str, limit: int = 20) -> list[SearchHit]:
+        """Exact-or-split-part match on symbol_name within one repo -- the
+        agent's 'go to definition' tool: bypasses embedding uncertainty
+        entirely when the caller already knows the symbol name. Matches a
+        bare name, an oversized-chunk split ("Name#part2"), or a method of a
+        class ("Name.method") -- same rule the eval harness uses to decide
+        whether a retrieved chunk answers a question about "Name"."""
+        if not self._client.collection_exists(collection):
+            return []
+        prefilter = models.Filter(
+            must=[
+                models.FieldCondition(key="repo", match=models.MatchValue(value=repo)),
+                models.FieldCondition(key="symbol_name", match=models.MatchText(text=name)),
+            ]
+        )
+        points, _ = self._client.scroll(collection_name=collection, scroll_filter=prefilter, limit=200)
+        matches = [
+            p
+            for p in points
+            if (symbol_name := (p.payload or {}).get("symbol_name", "")) == name
+            or symbol_name.startswith(f"{name}#part")
+            or symbol_name.startswith(f"{name}.")
+        ]
+        return [SearchHit(id=str(p.id), score=0.0, payload=p.payload or {}) for p in matches[:limit]]
+
     def keyword_search(
         self, collection: str, query_text: str, limit: int, extra_filter: models.Filter | None = None
     ) -> list[SearchHit]:

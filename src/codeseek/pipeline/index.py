@@ -8,8 +8,11 @@ from pathlib import Path
 
 from codeseek.chunking.code_chunker import chunk_python_source
 from codeseek.chunking.docs_chunker import chunk_doc_text
+from codeseek.chunking.generic_chunker import chunk_generic_source
 from codeseek.chunking.js_ts_chunker import chunk_js_ts_source
-from codeseek.config import RepoSpec
+from codeseek.chunking.notebook_chunker import chunk_notebook_source
+from codeseek.config import GENERIC_LANGUAGE_BY_EXTENSION, RepoSpec
+from codeseek.embedding.context import embedding_text
 from codeseek.embedding.service import EmbeddingService
 from codeseek.ingestion.walker import FileRecord, walk_repo
 from codeseek.observability.timing import timed_stage
@@ -17,6 +20,12 @@ from codeseek.store.qdrant_store import QdrantStore
 from codeseek.store.schema import ChunkPayload, collection_name
 
 logger = logging.getLogger(__name__)
+
+
+def _generic_language(full_path: Path) -> str:
+    if full_path.suffix:
+        return GENERIC_LANGUAGE_BY_EXTENSION.get(full_path.suffix, full_path.suffix.lstrip("."))
+    return full_path.name.lower()  # extensionless: Dockerfile, Makefile, ...
 
 
 def _file_to_chunks(repo_path: Path, record: FileRecord, repo: RepoSpec) -> list[ChunkPayload]:
@@ -39,6 +48,24 @@ def _file_to_chunks(repo_path: Path, record: FileRecord, repo: RepoSpec) -> list
                 symbol_type=c.symbol_type, start_line=c.start_line, end_line=c.end_line, text=c.text,
             )
             for c in chunk_js_ts_source(text, repo=repo.name, path=record.path, suffix=full_path.suffix)
+        ]
+
+    if record.category == "notebook":
+        return [
+            ChunkPayload(
+                repo=c.repo, language=c.language, path=c.path, symbol_name=c.symbol_name,
+                symbol_type=c.symbol_type, start_line=c.start_line, end_line=c.end_line, text=c.text,
+            )
+            for c in chunk_notebook_source(text, repo=repo.name, path=record.path)
+        ]
+
+    if record.category == "code_generic":
+        return [
+            ChunkPayload(
+                repo=c.repo, language=c.language, path=c.path, symbol_name=c.symbol_name,
+                symbol_type=c.symbol_type, start_line=c.start_line, end_line=c.end_line, text=c.text,
+            )
+            for c in chunk_generic_source(text, repo=repo.name, path=record.path, language=_generic_language(full_path))
         ]
 
     if record.category == "docs":
@@ -76,7 +103,7 @@ def index_repo(
         batch = chunks[start : start + batch_size]
 
         with timed_stage("embed", repo=repo.name, batch_size=len(batch)):
-            vectors_by_model = embedding_service.embed_all([c.text for c in batch])
+            vectors_by_model = embedding_service.embed_all([embedding_text(c) for c in batch])
 
         with timed_stage("upsert", repo=repo.name, batch_size=len(batch)):
             for model_key, vectors in vectors_by_model.items():
