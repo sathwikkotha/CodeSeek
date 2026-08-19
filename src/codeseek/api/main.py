@@ -1,6 +1,8 @@
 """Production ASGI entry point: `uvicorn codeseek.api.main:app`.
-Wires OpenAI embeddings + the OpenAI-backed explain agent, on-disk Qdrant
-storage, and the local cross-encoder reranker."""
+Wires OpenAI embeddings + the OpenAI-backed explain agent, Qdrant storage, and
+the local cross-encoder reranker."""
+
+import os
 
 from openai import OpenAI
 
@@ -19,7 +21,11 @@ from codeseek.store.qdrant_store import QdrantStore
 # debugging what looked like a stuck clone+index request.
 configure_json_logging()
 
-store = QdrantStore(path=str(QDRANT_PATH))
+# QDRANT_URL (e.g. "http://qdrant:6333" in docker-compose.yml) switches to a
+# containerized Qdrant; unset, this stays the on-disk single-machine default
+# every other entry point (scripts/index_one.py, tests) already uses.
+qdrant_url = os.environ.get("QDRANT_URL")
+store = QdrantStore(url=qdrant_url) if qdrant_url else QdrantStore(path=str(QDRANT_PATH))
 embedding_service = EmbeddingService(build_default_embedders())
 reranker = CrossEncoderReranker()
 openai_client = OpenAI()  # reads OPENAI_API_KEY, loaded from .env via config's import

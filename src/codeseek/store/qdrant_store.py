@@ -17,7 +17,7 @@ class SearchHit:
 
 
 def build_metadata_filter(repo: str | None, language: str | None) -> models.Filter | None:
-    conditions = []
+    conditions: list[models.Condition] = []
     if repo:
         conditions.append(models.FieldCondition(key="repo", match=models.MatchValue(value=repo)))
     if language:
@@ -35,7 +35,7 @@ class QdrantStore:
         timeout: seconds before a url-mode request gives up -- a real production
         knob, not just a test convenience; a hung connection is worse than a fast, clear error."""
         if url:
-            self._client = QdrantClient(url=url, timeout=timeout)
+            self._client = QdrantClient(url=url, timeout=int(timeout) if timeout is not None else None)
         elif path:
             self._client = QdrantClient(path=path)
         else:
@@ -58,7 +58,7 @@ class QdrantStore:
     def upsert_chunks(self, collection: str, chunks: list[ChunkPayload], vectors: list[list[float]]) -> None:
         points = [
             models.PointStruct(id=chunk.point_id(), vector=vector, payload=chunk.as_payload_dict())
-            for chunk, vector in zip(chunks, vectors)
+            for chunk, vector in zip(chunks, vectors, strict=True)
         ]
         self._client.upsert(collection_name=collection, points=points)
 
@@ -78,7 +78,7 @@ class QdrantStore:
         if not self._client.collection_exists(collection):
             return []
         result = self._client.facet(collection_name=collection, key="repo", limit=limit, exact=True)
-        return [(hit.value, hit.count) for hit in result.hits]
+        return [(str(hit.value), hit.count) for hit in result.hits]
 
     def delete_repo(self, collection: str, repo: str) -> None:
         """Remove every point for `repo` from `collection` -- used before a
@@ -131,7 +131,7 @@ class QdrantStore:
                 models.FieldCondition(key="symbol_name", match=models.MatchText(text=query_text)),
             ]
         )
-        must = [text_filter, extra_filter] if extra_filter else [text_filter]
+        must: list[models.Condition] = [text_filter, extra_filter] if extra_filter else [text_filter]
         points, _ = self._client.scroll(
             collection_name=collection, scroll_filter=models.Filter(must=must), limit=limit,
         )

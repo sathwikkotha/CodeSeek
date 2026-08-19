@@ -3,7 +3,7 @@ import json
 from codeseek.embedding.service import EmbeddingService
 from codeseek.eval.ground_truth import GroundTruthItem, load_ground_truth
 from codeseek.eval.harness import _is_relevant, run_eval
-from codeseek.eval.metrics import reciprocal_rank, recall_at_k
+from codeseek.eval.metrics import recall_at_k, reciprocal_rank
 from codeseek.store.qdrant_store import QdrantStore
 from codeseek.store.schema import ChunkPayload, collection_name
 
@@ -91,7 +91,7 @@ def test_run_eval_perfect_and_broken_model_scored_correctly():
         def embed(self, texts):
             return [[0.0, 0.0, 1.0] for _ in texts]  # never distinguishes anything
 
-    for key, embedder, vectors_source in [("good", good_embedder, good_embedder), ("broken", BrokenEmbedder(), BrokenEmbedder())]:
+    for key, vectors_source in [("good", good_embedder), ("broken", BrokenEmbedder())]:
         collection = collection_name(corpus_name, key)
         vectors = vectors_source.embed([c.text for c in chunks])
         store.ensure_collection(collection, vector_size=3)
@@ -103,7 +103,10 @@ def test_run_eval_perfect_and_broken_model_scored_correctly():
     ]
 
     embedding_service = EmbeddingService({"good": good_embedder, "broken": BrokenEmbedder()})
-    results = {r.model_key: r for r in run_eval(ground_truth, store, embedding_service, corpus_name, ["good", "broken"])}
+    results = {
+        r.model_key: r
+        for r in run_eval(ground_truth, store, embedding_service, corpus_name, ["good", "broken"])
+    }
 
     assert results["good"].recall_at_5 == 1.0
     assert results["good"].mrr == 1.0

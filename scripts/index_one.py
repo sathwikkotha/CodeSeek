@@ -28,7 +28,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("url", help="GitHub (or any git) repo URL")
     parser.add_argument("--name", default=None, help="Override the inferred repo name")
-    parser.add_argument("--language", default="unknown", help="Informational only -- chunkers detect per-file language themselves")
+    parser.add_argument(
+        "--language", default="unknown",
+        help="Informational only -- chunkers detect per-file language themselves",
+    )
     args = parser.parse_args()
 
     name = args.name or infer_repo_name(args.url)

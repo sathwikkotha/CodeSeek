@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from codeseek.agent.loop import explain as run_explain
 from codeseek.agent.loop import explain_stream as run_explain_stream
+from codeseek.api.jobs import JobStore
 from codeseek.config import CORPUS_NAME, REPOS_DIR, RepoSpec
 from codeseek.embedding.registry import OPENAI
 from codeseek.embedding.service import EmbeddingService
@@ -65,9 +66,12 @@ class IngestRequest(BaseModel):
     name: str | None = None
 
 
-class IngestResponse(BaseModel):
-    repo: str
-    chunks_indexed: int
+class IngestJobResponse(BaseModel):
+    job_id: str
+    state: str  # "pending" | "running" | "done" | "error"
+    repo: str | None = None
+    chunks_indexed: int | None = None
+    error: str | None = None
 
 
 class RepoInfo(BaseModel):
@@ -120,6 +124,7 @@ def create_app(
     reranker: Reranker | None = None, openai_client: OpenAIClient | None = None,
 ) -> FastAPI:
     app = FastAPI(title="CodeSeek")
+    ingest_jobs = JobStore()
 
     @app.get("/health")
     def health() -> dict:
@@ -139,21 +144,37 @@ def create_app(
         store.delete_repo(collection_name(corpus_name, OPENAI), name)
         return {"deleted": name}
 
-    @app.post("/ingest", response_model=IngestResponse)
-    def ingest(req: IngestRequest) -> IngestResponse:
+    @app.post("/ingest", response_model=IngestJobResponse, status_code=202)
+    def ingest(req: IngestRequest) -> IngestJobResponse:
         """Clone (or update) an arbitrary repo and index it into the same
-        corpus everything else lives in -- runs in-process, in the thread
-        FastAPI already dispatches sync routes to, so it doesn't need the
-        on-disk store lock a separate CLI process would fight over."""
+        corpus everything else lives in. Returns immediately with a job id --
+        the clone+chunk+embed pipeline runs on a background thread instead of
+        holding the request open for however long that takes (minutes, for a
+        real repo). Poll GET /ingest/{job_id} for progress."""
         name = req.name or infer_repo_name(req.url)
-        repo = RepoSpec(name, req.url, "unknown")
-        try:
-            repo_path = clone_or_update(repo, REPOS_DIR)
-        except subprocess.CalledProcessError as exc:
-            detail = (exc.stderr or str(exc)).strip()
-            raise HTTPException(status_code=422, detail=f"Couldn't clone '{req.url}': {detail}") from exc
-        total = index_repo(repo_path, repo, store, embedding_service, corpus_name=corpus_name)
-        return IngestResponse(repo=name, chunks_indexed=total)
+
+        def do_ingest() -> tuple[str, int]:
+            repo = RepoSpec(name, req.url, "unknown")
+            try:
+                repo_path = clone_or_update(repo, REPOS_DIR)
+            except subprocess.CalledProcessError as exc:
+                detail = (exc.stderr or str(exc)).strip()
+                raise RuntimeError(f"Couldn't clone '{req.url}': {detail}") from exc
+            total = index_repo(repo_path, repo, store, embedding_service, corpus_name=corpus_name)
+            return name, total
+
+        job = ingest_jobs.create()
+        ingest_jobs.run(job.id, do_ingest)
+        return IngestJobResponse(job_id=job.id, state=job.state)
+
+    @app.get("/ingest/{job_id}", response_model=IngestJobResponse)
+    def ingest_status(job_id: str) -> IngestJobResponse:
+        job = ingest_jobs.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail=f"No ingest job '{job_id}'.")
+        return IngestJobResponse(
+            job_id=job.id, state=job.state, repo=job.repo, chunks_indexed=job.chunks_indexed, error=job.error,
+        )
 
     @app.post("/search", response_model=SearchResponse)
     def search(req: SearchRequest) -> SearchResponse:
@@ -277,7 +298,8 @@ def create_app(
                     else:
                         payload = event
                     yield f"data: {json.dumps(payload)}\n\n"
-            except Exception as exc:  # surface as an SSE frame -- an abrupt connection drop looks like a bug, not an error message
+            except Exception as exc:
+                # Surface as an SSE frame -- an abrupt connection drop looks like a bug, not an error message.
                 yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
 
         return StreamingResponse(event_source(), media_type="text/event-stream")

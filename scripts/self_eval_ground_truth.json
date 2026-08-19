@@ -1,0 +1,62 @@
+[
+  {
+    "question": "How does the citation verification check that a cited file and line range are real?",
+    "repo": "codeseek",
+    "path": "agent/verify.py",
+    "symbol_name": "verify_citations"
+  },
+  {
+    "question": "How are the pre-rerank and post-rerank orderings fused back together into one ranking?",
+    "repo": "codeseek",
+    "path": "retrieval/hybrid.py",
+    "symbol_name": "rrf_fuse"
+  },
+  {
+    "question": "How do the vector search results and keyword search results get merged into one ranked list?",
+    "repo": "codeseek",
+    "path": "retrieval/hybrid.py",
+    "symbol_name": "merge_hits"
+  },
+  {
+    "question": "How is a Python source file split into one chunk per top-level function and class?",
+    "repo": "codeseek",
+    "path": "chunking/code_chunker.py",
+    "symbol_name": "chunk_python_source"
+  },
+  {
+    "question": "How does the agent loop stream tool calls and the generated answer back to the caller?",
+    "repo": "codeseek",
+    "path": "agent/loop.py",
+    "symbol_name": "explain_stream"
+  },
+  {
+    "question": "How is a git repository cloned or updated on disk before it gets indexed?",
+    "repo": "codeseek",
+    "path": "ingestion/clone.py",
+    "symbol_name": "clone_or_update"
+  },
+  {
+    "question": "How does the vector store create a new collection with the right vector size and payload indexes?",
+    "repo": "codeseek",
+    "path": "store/qdrant_store.py",
+    "symbol_name": "QdrantStore.ensure_collection"
+  },
+  {
+    "question": "How does the cross-encoder reranker score candidate chunks against a search query?",
+    "repo": "codeseek",
+    "path": "retrieval/reranker.py",
+    "symbol_name": "CrossEncoderReranker.rerank"
+  },
+  {
+    "question": "How is the text that actually gets embedded for a code chunk constructed, including its symbol name?",
+    "repo": "codeseek",
+    "path": "embedding/context.py",
+    "symbol_name": "embedding_text"
+  },
+  {
+    "question": "Where is the FastAPI app assembled with its search and explain routes?",
+    "repo": "codeseek",
+    "path": "api/app.py",
+    "symbol_name": "create_app"
+  }
+]

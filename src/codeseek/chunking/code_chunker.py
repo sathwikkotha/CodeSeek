@@ -48,12 +48,12 @@ class CodeChunk:
     text: str
 
 
-def _line_span(node: ast.AST) -> tuple[int, int]:
+def _line_span(node: ast.stmt) -> tuple[int, int]:
     start = node.lineno
     decorators = getattr(node, "decorator_list", None)
     if decorators:
         start = decorators[0].lineno
-    return start, node.end_lineno
+    return start, node.end_lineno or start
 
 
 def _is_docstring(stmt: ast.stmt) -> bool:
@@ -124,13 +124,12 @@ def _chunk_class(node: ast.ClassDef, lines: list[str], repo: str, path: str) -> 
         body = body[1:]
 
     for member in body:
-        member_type = type(member)
-        if member_type in _METHOD_TYPE:
+        if isinstance(member, (ast.FunctionDef, ast.AsyncFunctionDef)):
             overview_spans.append(_signature_span(member))
             m_start, m_end = _line_span(member)
             m_text = "\n".join(lines[m_start - 1 : m_end])
             chunks.extend(_emit(
-                repo, path, f"{node.name}.{member.name}", _METHOD_TYPE[member_type], m_start, m_end, m_text,
+                repo, path, f"{node.name}.{member.name}", _METHOD_TYPE[type(member)], m_start, m_end, m_text,
             ))
         elif isinstance(member, (ast.Assign, ast.AnnAssign)):
             # class-level field declarations (dataclass-style attributes) --
@@ -155,14 +154,14 @@ def chunk_python_source(source: str, repo: str, path: str) -> list[CodeChunk]:
     chunks: list[CodeChunk] = []
 
     for node in ast.iter_child_nodes(tree):
-        if type(node) is ast.ClassDef:
+        if isinstance(node, ast.ClassDef):
             chunks.extend(_chunk_class(node, lines, repo, path))
             continue
 
-        symbol_type = _TOP_LEVEL_TYPE.get(type(node))
-        if symbol_type is None:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
 
+        symbol_type = _TOP_LEVEL_TYPE[type(node)]
         start_line, end_line = _line_span(node)
         text = "\n".join(lines[start_line - 1 : end_line])
         chunks.extend(_emit(repo, path, node.name, symbol_type, start_line, end_line, text))

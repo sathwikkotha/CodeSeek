@@ -3,8 +3,8 @@ calling JSON schemas. Tools are built fresh per /explain request via
 build_tools(), a factory closure bound to one session's repo -- not global
 state, so concurrent requests for different repos never cross-contaminate."""
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from codeseek.config import CORPUS_NAME
 from codeseek.embedding.registry import OPENAI

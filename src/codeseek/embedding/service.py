@@ -4,12 +4,13 @@ identical queries, since a search UI/eval harness re-sends the same question
 often and re-embedding it is pure wasted compute."""
 
 from collections import OrderedDict
+from collections.abc import Mapping
 
 from codeseek.embedding.base import Embedder
 
 
 class EmbeddingService:
-    def __init__(self, embedders: dict[str, Embedder], query_cache_size: int = 256):
+    def __init__(self, embedders: Mapping[str, Embedder], query_cache_size: int = 256):
         self._embedders = embedders
         self._query_cache: OrderedDict[tuple[str, str], list[float]] = OrderedDict()
         self._query_cache_size = query_cache_size

@@ -10,11 +10,13 @@ tools repeatedly (the Claude Code / Codex pattern), not multiple agents --
 simpler, cheaper, and there's no clear win from splitting roles here."""
 
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterator
+from typing import cast
 
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam, ChatCompletionToolParam
 
 from codeseek.agent.tools import build_tool_specs, build_tools
 from codeseek.agent.verify import CitationCheck, verify_citations
@@ -164,8 +166,14 @@ def explain_stream(
     for _ in range(MAX_ITERATIONS):
         yield {"type": "status", "phase": "thinking"}
 
+        # messages/tools are built as plain dicts (not the SDK's TypedDicts) so this
+        # loop can grow the history generically -- structurally identical at runtime,
+        # cast here rather than threading TypedDict types through the whole loop.
         stream = client.chat.completions.create(
-            model=model, messages=messages, tools=tool_specs, max_completion_tokens=MAX_COMPLETION_TOKENS,
+            model=model,
+            messages=cast(list[ChatCompletionMessageParam], messages),
+            tools=cast(list[ChatCompletionToolParam], tool_specs),
+            max_completion_tokens=MAX_COMPLETION_TOKENS,
             stream=True, stream_options={"include_usage": True},
         )
 
@@ -259,11 +267,12 @@ def explain(
     """Blocking wrapper over explain_stream() for callers that just want the
     final answer (tests, scripts, non-streaming API callers) -- drains the
     generator and returns the result from its terminal "done" event."""
-    result = None
+    result: ExplainResult | None = None
     for event in explain_stream(
         repo_name, repo_path, question, store, embedding_service, reranker,
         client=client, corpus_name=corpus_name, model=model,
     ):
         if event["type"] == "done":
             result = event["result"]
+    assert result is not None, "explain_stream always yields a 'done' event before returning"
     return result

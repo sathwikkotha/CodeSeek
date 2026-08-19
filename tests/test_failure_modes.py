@@ -26,7 +26,10 @@ def test_unreachable_qdrant_url_raises_clear_error_not_hang_or_silent_empty():
     # An unroutable address (TEST-NET-1, RFC 5737) with a short timeout --
     # fails fast and loud instead of hanging on the client's default timeout.
     store = QdrantStore(url="http://192.0.2.1:6333", timeout=2)
-    with pytest.raises(Exception):
+    # Intentionally broad: the point of this test is "some error happens, not a
+    # hang or a silent empty result" -- the exact exception type is a qdrant-client
+    # implementation detail (transport-dependent), not something to pin a test to.
+    with pytest.raises(Exception):  # noqa: B017
         store.ensure_collection("whatever", vector_size=3)
 
 
@@ -110,5 +113,7 @@ def test_upsert_with_wrong_vector_dimension_raises_clear_error():
         symbol_type="function", start_line=1, end_line=1, text="def f(): pass",
     )
 
-    with pytest.raises(Exception):
+    # Broad on purpose -- Qdrant's own dimension-mismatch error type is a client
+    # implementation detail; what matters here is that it raises, not silently corrupts.
+    with pytest.raises(Exception):  # noqa: B017
         store.upsert_chunks("dimtest", [chunk], [[1.0, 0.0]])  # wrong dimension: 2 instead of 3

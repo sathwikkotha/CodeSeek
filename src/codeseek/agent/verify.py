@@ -11,6 +11,15 @@ check means "this location is real"; it does not mean "this location proves
 the sentence next to it." Catching the former is still the highest-value,
 cheapest check available, since a citation pointing at a nonexistent file or
 line is the most damaging and most mechanically detectable failure mode.
+
+A citation of "path:0-0" is not a hallucination -- it's the agent faithfully
+citing a notebook or doc chunk exactly as shown to it, since notebook_chunker.py
+and pipeline/index.py's docs branch both store start_line=end_line=0 by design
+(a notebook is JSON with no stable per-cell line numbers; a doc chunk is
+addressed by position, not a line range). Bounds-checking 0-0 against a real
+line count would fail every single notebook/doc citation regardless of
+whether the file is actually right, so it's checked as "does this file exist"
+only, the same as any other citation whose location isn't line-addressable.
 """
 
 import re
@@ -60,6 +69,12 @@ def verify_citations(answer: str | None, repo_name: str, repo_path: Path) -> lis
             continue
         if not full_path.is_file():
             checks.append(CitationCheck(citation, path, start_line, end_line, False, "file not found"))
+            continue
+
+        if start_line == 0 and end_line == 0:
+            # Not a real line range -- a notebook cell or doc chunk cited as-shown
+            # (see the module docstring). The file existing is all there is to check.
+            checks.append(CitationCheck(citation, path, start_line, end_line, True))
             continue
 
         line_count = sum(1 for _ in full_path.open(encoding="utf-8", errors="ignore"))

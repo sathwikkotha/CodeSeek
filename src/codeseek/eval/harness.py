@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from codeseek.embedding.service import EmbeddingService
 from codeseek.eval.ground_truth import GroundTruthItem
-from codeseek.eval.metrics import reciprocal_rank, recall_at_k
+from codeseek.eval.metrics import recall_at_k, reciprocal_rank
 from codeseek.retrieval.hybrid import HybridRetriever, Reranker
 from codeseek.store.qdrant_store import QdrantStore
 from codeseek.store.schema import collection_name

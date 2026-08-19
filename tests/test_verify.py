@@ -85,6 +85,42 @@ def test_duplicate_citations_are_only_checked_once(tmp_path):
     assert len(checks) == 1
 
 
+def test_citation_with_zero_zero_range_is_valid_if_file_exists(tmp_path):
+    """notebook_chunker.py and the docs branch of pipeline/index.py both store
+    start_line=end_line=0 (no stable, citeable line range for a notebook cell
+    or a doc chunk) -- the agent cites those chunks exactly as shown, so
+    "path:0-0" must verify on file existence alone, not fail every time."""
+    repo_root = _write_repo(tmp_path, {"notebook.ipynb": "{}"})
+
+    checks = verify_citations("See `demo/notebook.ipynb:0-0`", "demo", repo_root)
+
+    assert len(checks) == 1
+    assert checks[0].valid is True
+    assert checks[0].reason is None
+
+
+def test_citation_with_zero_zero_range_to_missing_file_is_invalid(tmp_path):
+    repo_root = _write_repo(tmp_path, {"auth.py": "line1\n"})
+
+    checks = verify_citations("See `demo/does_not_exist.ipynb:0-0`", "demo", repo_root)
+
+    assert len(checks) == 1
+    assert checks[0].valid is False
+    assert checks[0].reason == "file not found"
+
+
+def test_citation_with_only_start_zero_still_bounds_checked(tmp_path):
+    """The 0-0 special case is exact -- start=0 paired with a nonzero end isn't
+    the notebook/doc convention, so it still goes through the real bounds check."""
+    repo_root = _write_repo(tmp_path, {"auth.py": "line1\nline2\n"})
+
+    checks = verify_citations("See `demo/auth.py:0-5`", "demo", repo_root)
+
+    assert len(checks) == 1
+    assert checks[0].valid is False
+    assert checks[0].reason == "line range out of bounds"
+
+
 def test_multiple_distinct_citations_all_checked(tmp_path):
     repo_root = _write_repo(tmp_path, {"a.py": "line1\nline2\n", "b.py": "line1\n"})
 

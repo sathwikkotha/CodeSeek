@@ -2,9 +2,10 @@
 sitter chunking), 'docs', 'notebook', 'code_generic' (line-based chunking for
 any other plausible source file), or skips it."""
 
+from collections.abc import Iterator
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterator, Literal
+from typing import Literal
 
 from codeseek.config import (
     CODE_EXTENSIONS,

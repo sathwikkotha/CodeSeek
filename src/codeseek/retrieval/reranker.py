@@ -31,6 +31,6 @@ class CrossEncoderReranker:
         pairs = [(query, hit.payload.get("text", "")) for hit in hits]
         scores = self._model.predict(pairs)
 
-        rescored = [replace(hit, score=float(score)) for hit, score in zip(hits, scores)]
+        rescored = [replace(hit, score=float(score)) for hit, score in zip(hits, scores, strict=True)]
         rescored.sort(key=lambda h: h.score, reverse=True)
         return rescored[:top_k]

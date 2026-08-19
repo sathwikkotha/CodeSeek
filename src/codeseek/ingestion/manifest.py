@@ -1,8 +1,8 @@
 """Writes/reads the ingestion manifest: one JSON line per (repo, file) discovered."""
 
 import json
+from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Iterable, Iterator
 
 from codeseek.ingestion.walker import FileRecord, file_record_to_dict
 

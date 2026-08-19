@@ -1,4 +1,5 @@
 import json
+import time
 
 from fastapi.testclient import TestClient
 
@@ -18,6 +19,19 @@ class FakeEmbedder:
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         return [[1.0, 0.0, 0.0] if "jwt" in t.lower() else [0.0, 1.0, 0.0] for t in texts]
+
+
+def _wait_for_ingest(client: TestClient, job_id: str, timeout_s: float = 5.0) -> dict:
+    """Poll GET /ingest/{job_id} until the background job leaves pending/running --
+    the job runs on a real background thread even under TestClient, so this mirrors
+    how a real caller (the Streamlit UI) has to observe completion."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        body = client.get(f"/ingest/{job_id}").json()
+        if body["state"] in ("done", "error"):
+            return body
+        time.sleep(0.02)
+    raise TimeoutError(f"ingest job {job_id} did not finish within {timeout_s}s")
 
 
 def _make_app_with_data():
@@ -191,8 +205,9 @@ def test_ingest_clones_indexes_and_makes_repo_searchable(tmp_path, monkeypatch):
     client = TestClient(app)
 
     resp = client.post("/ingest", json={"url": "https://github.com/example/widgetlib.git"})
-    assert resp.status_code == 200
-    body = resp.json()
+    assert resp.status_code == 202
+    body = _wait_for_ingest(client, resp.json()["job_id"])
+    assert body["state"] == "done"
     assert body["repo"] == "widgetlib"
     assert body["chunks_indexed"] == 1
 
@@ -214,7 +229,39 @@ def test_ingest_respects_custom_name(tmp_path, monkeypatch):
     client = TestClient(app)
 
     resp = client.post("/ingest", json={"url": "https://github.com/example/repo.git", "name": "my-custom-name"})
-    assert resp.json()["repo"] == "my-custom-name"
+    body = _wait_for_ingest(client, resp.json()["job_id"])
+    assert body["repo"] == "my-custom-name"
+
+
+def test_ingest_clone_failure_surfaces_as_a_failed_job_not_a_500(monkeypatch):
+    import subprocess
+
+    def _raise(repo, dest_dir):
+        raise subprocess.CalledProcessError(128, ["git", "clone"], stderr="repository not found")
+
+    monkeypatch.setattr("codeseek.api.app.clone_or_update", _raise)
+
+    store = QdrantStore(location=":memory:")
+    embedding_service = EmbeddingService({OPENAI: FakeEmbedder()})
+    app = create_app(store, embedding_service, corpus_name="ingesttest3")
+    client = TestClient(app)
+
+    resp = client.post("/ingest", json={"url": "https://github.com/example/missing.git"})
+    assert resp.status_code == 202  # accepted -- the failure happens in the background job
+
+    body = _wait_for_ingest(client, resp.json()["job_id"])
+    assert body["state"] == "error"
+    assert "repository not found" in body["error"]
+
+
+def test_ingest_status_for_unknown_job_is_404():
+    store = QdrantStore(location=":memory:")
+    embedding_service = EmbeddingService({OPENAI: FakeEmbedder()})
+    app = create_app(store, embedding_service, corpus_name="ingesttest4")
+    client = TestClient(app)
+
+    resp = client.get("/ingest/does-not-exist")
+    assert resp.status_code == 404
 
 
 def test_search_against_unindexed_collection_returns_empty_not_error():
@@ -275,7 +322,10 @@ def test_explain_calls_tools_and_returns_grounded_answer(tmp_path, monkeypatch):
     # the citation in the answer ("demo/auth.py:1-1") points at a real file
     # actually on disk in this fixture -- verify_citations should confirm it
     assert body["citation_checks"] == [
-        {"citation": "demo/auth.py:1-1", "path": "auth.py", "start_line": 1, "end_line": 1, "valid": True, "reason": None},
+        {
+            "citation": "demo/auth.py:1-1", "path": "auth.py", "start_line": 1,
+            "end_line": 1, "valid": True, "reason": None,
+        },
     ]
     # no usage chunk was scripted onto either turn -- Usage.add() is never called
     assert body["usage"]["requests"] == 0
@@ -348,7 +398,10 @@ def test_explain_stream_emits_tool_call_and_answer_delta_events_ending_in_done(t
     done = events[-1]
     assert done["answer"] == "JWT is validated by validate_jwt. demo/auth.py:1-1"
     assert done["citation_checks"] == [
-        {"citation": "demo/auth.py:1-1", "path": "auth.py", "start_line": 1, "end_line": 1, "valid": True, "reason": None},
+        {
+            "citation": "demo/auth.py:1-1", "path": "auth.py", "start_line": 1,
+            "end_line": 1, "valid": True, "reason": None,
+        },
     ]
 
 

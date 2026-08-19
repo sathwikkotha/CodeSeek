@@ -41,7 +41,10 @@ def chunk_notebook_source(source: str, repo: str, path: str) -> list[CodeChunk]:
     for index, cell in enumerate(notebook.get("cells", [])):
         if not isinstance(cell, dict):
             continue
-        symbol_type = _CELL_TYPE_TO_SYMBOL_TYPE.get(cell.get("cell_type"))
+        cell_type = cell.get("cell_type")
+        if not isinstance(cell_type, str):
+            continue
+        symbol_type = _CELL_TYPE_TO_SYMBOL_TYPE.get(cell_type)
         if symbol_type is None:
             continue
 

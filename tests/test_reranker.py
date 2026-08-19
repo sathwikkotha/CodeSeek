@@ -16,8 +16,15 @@ def test_real_cross_encoder_ranks_the_actually_relevant_chunk_first():
     from codeseek.retrieval.reranker import CrossEncoderReranker
 
     hits = [
-        _hit("wrong", "def parse_csv(path):\n    \"\"\"Parse a CSV file into rows.\"\"\"\n    return open(path).readlines()"),
-        _hit("right", "def validate_jwt(token):\n    \"\"\"Decode and verify a JWT signature, raise if invalid.\"\"\"\n    return jwt.decode(token)"),
+        _hit(
+            "wrong",
+            "def parse_csv(path):\n    \"\"\"Parse a CSV file into rows.\"\"\"\n    return open(path).readlines()",
+        ),
+        _hit(
+            "right",
+            "def validate_jwt(token):\n    \"\"\"Decode and verify a JWT signature, raise if invalid.\"\"\"\n"
+            "    return jwt.decode(token)",
+        ),
     ]
 
     reranker = CrossEncoderReranker()

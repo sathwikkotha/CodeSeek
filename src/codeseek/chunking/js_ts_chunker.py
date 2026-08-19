@@ -46,18 +46,22 @@ def _declarator_symbol(node: Node) -> tuple[str, str] | None:
     declarator = declarators[0]
     value = declarator.child_by_field_name("value")
     name = declarator.child_by_field_name("name")
-    if value is None or name is None or value.type not in _FUNCTION_VALUE_TYPES:
+    if value is None or name is None or name.text is None or value.type not in _FUNCTION_VALUE_TYPES:
         return None
     return name.text.decode("utf-8"), "function"
 
 
+def _node_name(name: Node | None) -> str:
+    if name is None or name.text is None:
+        return "anonymous"
+    return name.text.decode("utf-8")
+
+
 def _classify(node: Node) -> tuple[str, str] | None:
     if node.type == "function_declaration":
-        name = node.child_by_field_name("name")
-        return (name.text.decode("utf-8") if name else "anonymous"), "function"
+        return _node_name(node.child_by_field_name("name")), "function"
     if node.type == "class_declaration":
-        name = node.child_by_field_name("name")
-        return (name.text.decode("utf-8") if name else "anonymous"), "class"
+        return _node_name(node.child_by_field_name("name")), "class"
     if node.type in ("lexical_declaration", "variable_declaration"):
         return _declarator_symbol(node)
     return None
@@ -86,11 +90,11 @@ def chunk_js_ts_source(source: str, repo: str, path: str, suffix: str) -> list[C
             else:
                 value = node.child_by_field_name("value")
                 if value is not None and value.type in _FUNCTION_VALUE_TYPES | {"class"}:
-                    classified = ("default", "class" if value.type == "class" else "function")
-                    chunks.extend(_emit(slice_node, classified, lines, repo, language_name, path))
+                    default_classified: tuple[str, str] = ("default", "class" if value.type == "class" else "function")
+                    chunks.extend(_emit(slice_node, default_classified, lines, repo, language_name, path))
                 continue
 
-        classified = _classify(target)
+        classified: tuple[str, str] | None = _classify(target)
         if classified is None:
             continue
         chunks.extend(_emit(slice_node, classified, lines, repo, language_name, path))

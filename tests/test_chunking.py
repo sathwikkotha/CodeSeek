@@ -2,7 +2,6 @@ from codeseek.chunking.code_chunker import chunk_python_source
 from codeseek.chunking.docs_chunker import chunk_doc_text
 from codeseek.chunking.shared import count_tokens, pack_units
 
-
 SAMPLE_SOURCE = '''\
 import os
 
