@@ -114,3 +114,69 @@ def test_run_eval_perfect_and_broken_model_scored_correctly():
     # still surfaces the right chunk via exact-term matching, so recall isn't
     # necessarily 0, but it should score no better than the good embedder.
     assert results["broken"].mrr <= results["good"].mrr
+
+
+class SpyEmbedder:
+    """Records exactly what text it was asked to embed -- used to prove
+    run_eval's query_expander hook controls the vector leg's input text
+    without needing a real HyDE model call in a unit test."""
+
+    dimensions = 3
+
+    def __init__(self):
+        self.received_texts: list[str] = []
+
+    def embed(self, texts):
+        self.received_texts.extend(texts)
+        return [[0.0, 0.0, 1.0] for _ in texts]
+
+
+def test_run_eval_query_expander_controls_what_gets_embedded():
+    store = QdrantStore(location=":memory:")
+    corpus_name = "evaltest_query_expander"
+    collection = collection_name(corpus_name, "spy")
+    store.ensure_collection(collection, vector_size=3)
+    store.upsert_chunks(
+        collection,
+        [ChunkPayload(
+            repo="demo", language="python", path="auth.py", symbol_name="validate_jwt",
+            symbol_type="function", start_line=1, end_line=5, text="def validate_jwt(token): ...",
+        )],
+        [[0.0, 0.0, 1.0]],
+    )
+
+    spy = SpyEmbedder()
+    embedding_service = EmbeddingService({"spy": spy})
+    ground_truth = [GroundTruthItem("how is a token checked", "demo", "auth.py", "validate_jwt")]
+
+    run_eval(
+        ground_truth, store, embedding_service, corpus_name, ["spy"],
+        query_expander=lambda q: f"EXPANDED::{q}",
+    )
+
+    # the embedder saw the expander's output, not the raw question -- proving
+    # HyDE-style expansion actually reaches the vector leg's embedding call
+    assert spy.received_texts == ["EXPANDED::how is a token checked"]
+
+
+def test_run_eval_without_query_expander_embeds_the_raw_question():
+    store = QdrantStore(location=":memory:")
+    corpus_name = "evaltest_no_expander"
+    collection = collection_name(corpus_name, "spy")
+    store.ensure_collection(collection, vector_size=3)
+    store.upsert_chunks(
+        collection,
+        [ChunkPayload(
+            repo="demo", language="python", path="auth.py", symbol_name="validate_jwt",
+            symbol_type="function", start_line=1, end_line=5, text="def validate_jwt(token): ...",
+        )],
+        [[0.0, 0.0, 1.0]],
+    )
+
+    spy = SpyEmbedder()
+    embedding_service = EmbeddingService({"spy": spy})
+    ground_truth = [GroundTruthItem("how is a token checked", "demo", "auth.py", "validate_jwt")]
+
+    run_eval(ground_truth, store, embedding_service, corpus_name, ["spy"])
+
+    assert spy.received_texts == ["how is a token checked"]

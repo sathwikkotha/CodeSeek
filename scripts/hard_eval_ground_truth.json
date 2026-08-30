@@ -1,0 +1,170 @@
+[
+  {
+    "question": "What stops a single huge function or class from turning into one giant chunk that blows past the token budget?",
+    "repo": "codeseek",
+    "path": "chunking/shared.py",
+    "symbol_name": "pack_units"
+  },
+  {
+    "question": "How does the system measure how many tokens a piece of text would use before deciding whether it fits in a chunk?",
+    "repo": "codeseek",
+    "path": "chunking/shared.py",
+    "symbol_name": "count_tokens"
+  },
+  {
+    "question": "How wide a candidate pool does the system pull back before narrowing down to the number of results the caller actually asked for?",
+    "repo": "codeseek",
+    "path": "retrieval/hybrid.py",
+    "symbol_name": "fetch_k_for"
+  },
+  {
+    "question": "Where does a project's badge row and raw HTML markup get stripped out of a README before it's split into pieces?",
+    "repo": "codeseek",
+    "path": "chunking/docs_chunker.py",
+    "symbol_name": "_strip_badge_and_html_noise"
+  },
+  {
+    "question": "How does a block of prose actually get broken apart into individual sentences for chunking?",
+    "repo": "codeseek",
+    "path": "chunking/docs_chunker.py",
+    "symbol_name": "split_into_sentences"
+  },
+  {
+    "question": "What turns a whole documentation file into the smaller pieces that eventually get embedded?",
+    "repo": "codeseek",
+    "path": "chunking/docs_chunker.py",
+    "symbol_name": "chunk_doc_text"
+  },
+  {
+    "question": "How does a Jupyter notebook file get turned into searchable pieces given that it's really just JSON underneath?",
+    "repo": "codeseek",
+    "path": "chunking/notebook_chunker.py",
+    "symbol_name": "chunk_notebook_source"
+  },
+  {
+    "question": "What happens to a source file written in a language that has no dedicated parser at all, like Go or Rust?",
+    "repo": "codeseek",
+    "path": "chunking/generic_chunker.py",
+    "symbol_name": "chunk_generic_source"
+  },
+  {
+    "question": "How does a JavaScript or TypeScript file get walked and split into its individual function and class pieces?",
+    "repo": "codeseek",
+    "path": "chunking/js_ts_chunker.py",
+    "symbol_name": "chunk_js_ts_source"
+  },
+  {
+    "question": "What decides whether a top-level JavaScript or TypeScript node is a function, a class, or something to skip entirely?",
+    "repo": "codeseek",
+    "path": "chunking/js_ts_chunker.py",
+    "symbol_name": "_classify"
+  },
+  {
+    "question": "How does a camelCase or snake_case identifier get broken apart into separate words before being fed into the embedding model?",
+    "repo": "codeseek",
+    "path": "embedding/context.py",
+    "symbol_name": "split_identifier"
+  },
+  {
+    "question": "What assigns every chunk a stable identifier so re-indexing the same file overwrites the old point instead of creating a duplicate?",
+    "repo": "codeseek",
+    "path": "store/schema.py",
+    "symbol_name": "ChunkPayload.point_id"
+  },
+  {
+    "question": "Where does a repo name and a language get turned into an actual database filter condition?",
+    "repo": "codeseek",
+    "path": "store/qdrant_store.py",
+    "symbol_name": "build_metadata_filter"
+  },
+  {
+    "question": "What lets a caller jump straight to a function's definition by its exact name instead of relying on a similarity search?",
+    "repo": "codeseek",
+    "path": "store/qdrant_store.py",
+    "symbol_name": "QdrantStore.find_by_symbol"
+  },
+  {
+    "question": "How does a query get matched against the raw text and symbol name fields using plain substring-style matching rather than vector math?",
+    "repo": "codeseek",
+    "path": "store/qdrant_store.py",
+    "symbol_name": "QdrantStore.keyword_search"
+  },
+  {
+    "question": "What runs the actual nearest-neighbor cosine similarity lookup against the stored vectors?",
+    "repo": "codeseek",
+    "path": "store/qdrant_store.py",
+    "symbol_name": "QdrantStore.vector_search"
+  },
+  {
+    "question": "What actually issues the network call to OpenAI to turn a batch of text chunks into vectors, and retries if the call fails transiently?",
+    "repo": "codeseek",
+    "path": "embedding/openai_embedder.py",
+    "symbol_name": "OpenAIEmbedder.embed"
+  },
+  {
+    "question": "Where does a repeated identical search query get served from a cache instead of paying for another embedding call?",
+    "repo": "codeseek",
+    "path": "embedding/service.py",
+    "symbol_name": "EmbeddingService.embed_one"
+  },
+  {
+    "question": "How does every chunk in a batch get embedded through each configured model at once during indexing?",
+    "repo": "codeseek",
+    "path": "embedding/service.py",
+    "symbol_name": "EmbeddingService.embed_all"
+  },
+  {
+    "question": "What ties chunking, embedding, and storing together into one full pass over a freshly cloned repository?",
+    "repo": "codeseek",
+    "path": "pipeline/index.py",
+    "symbol_name": "index_repo"
+  },
+  {
+    "question": "How does one raw source file get routed to the correct chunker based on its category and file extension?",
+    "repo": "codeseek",
+    "path": "pipeline/index.py",
+    "symbol_name": "_file_to_chunks"
+  },
+  {
+    "question": "What builds the three function-calling tool definitions describing search, symbol lookup, and file reading that get passed to the model?",
+    "repo": "codeseek",
+    "path": "agent/tools.py",
+    "symbol_name": "build_tool_specs"
+  },
+  {
+    "question": "Where does the code check whether the correct answer landed anywhere within the first handful of results?",
+    "repo": "codeseek",
+    "path": "eval/metrics.py",
+    "symbol_name": "recall_at_k"
+  },
+  {
+    "question": "What computes one over the position of the first correct answer in a ranked list of results?",
+    "repo": "codeseek",
+    "path": "eval/metrics.py",
+    "symbol_name": "reciprocal_rank"
+  },
+  {
+    "question": "How does the evaluation harness decide whether a retrieved chunk actually counts as answering a ground-truth question, given that a big symbol might be split into several parts?",
+    "repo": "codeseek",
+    "path": "eval/harness.py",
+    "symbol_name": "_is_relevant"
+  },
+  {
+    "question": "How does a Python class get split so each method becomes its own separately retrievable chunk while still keeping an overview of the whole class?",
+    "repo": "codeseek",
+    "path": "chunking/code_chunker.py",
+    "symbol_name": "_chunk_class"
+  },
+  {
+    "question": "How are several separate, non-adjacent line ranges from a class merged into one readable excerpt with gaps marked?",
+    "repo": "codeseek",
+    "path": "chunking/code_chunker.py",
+    "symbol_name": "_render_spans"
+  },
+  {
+    "question": "How does an oversized JavaScript function or class that's too big for one chunk get split into multiple smaller labeled parts?",
+    "repo": "codeseek",
+    "path": "chunking/js_ts_chunker.py",
+    "symbol_name": "_emit"
+  }
+]

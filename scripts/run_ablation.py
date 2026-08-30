@@ -91,7 +91,7 @@ def main() -> int:
         qvec = embedding_service.embed_one(OPENAI, item.question)
         vhits = store.vector_search(collection, qvec, limit=fetch_k)
         khits = store.keyword_search(collection, item.question, limit=fetch_k)
-        merged = merge_hits(vhits, khits, fetch_k)
+        merged = merge_hits(vhits, khits, fetch_k, query_text=item.question)
         merged_by_question.append(merged)
         hybrid_hits.append(merged[:TOP_K])
     results["2. + keyword hybrid (vector + lexical merge)"] = _score(hybrid_hits, ground_truth)

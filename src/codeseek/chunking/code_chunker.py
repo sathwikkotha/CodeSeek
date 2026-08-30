@@ -46,6 +46,25 @@ class CodeChunk:
     start_line: int
     end_line: int
     text: str
+    leading_comment: str = ""
+
+
+def _leading_comment(start_line: int, lines: list[str]) -> str:
+    """The block of '#' comment lines immediately above `start_line` (1-indexed,
+    already past any decorators), if any -- `ast` never attaches these to the
+    node at all (unlike a docstring, which is a real statement in the body), so
+    without this they're silently invisible to both the chunk text and the
+    embedding, even when they're the clearest natural-language explanation of
+    why the function exists. Stops at the first blank or non-comment line, so
+    only a comment block genuinely attached to this def/class counts -- not
+    unrelated commentary trailing the previous statement."""
+    collected: list[str] = []
+    i = start_line - 2  # 0-indexed line directly above start_line
+    while i >= 0 and lines[i].strip().startswith("#"):
+        collected.append(lines[i].strip().lstrip("#").strip())
+        i -= 1
+    collected.reverse()
+    return " ".join(c for c in collected if c)
 
 
 def _line_span(node: ast.stmt) -> tuple[int, int]:
@@ -76,11 +95,13 @@ def _signature_span(node: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[int, 
 
 def _emit(
     repo: str, path: str, symbol_name: str, symbol_type: str, start_line: int, end_line: int, text: str,
+    leading_comment: str = "",
 ) -> list[CodeChunk]:
     if count_tokens(text) <= MAX_CHUNK_TOKENS:
         return [CodeChunk(
             repo=repo, language="python", path=path, symbol_name=symbol_name,
             symbol_type=symbol_type, start_line=start_line, end_line=end_line, text=text,
+            leading_comment=leading_comment,
         )]
 
     packed = pack_units(text.split("\n"), MAX_CHUNK_TOKENS, OVERSIZED_OVERLAP_RATIO, joiner="\n")
@@ -88,7 +109,7 @@ def _emit(
         CodeChunk(
             repo=repo, language="python", path=path, symbol_name=f"{symbol_name}#part{part_num}",
             symbol_type=symbol_type, start_line=start_line + rel_start, end_line=start_line + rel_end,
-            text=piece_text,
+            text=piece_text, leading_comment=leading_comment,
         )
         for part_num, (rel_start, rel_end, piece_text) in enumerate(packed, start=1)
     ]
@@ -130,6 +151,7 @@ def _chunk_class(node: ast.ClassDef, lines: list[str], repo: str, path: str) -> 
             m_text = "\n".join(lines[m_start - 1 : m_end])
             chunks.extend(_emit(
                 repo, path, f"{node.name}.{member.name}", _METHOD_TYPE[type(member)], m_start, m_end, m_text,
+                leading_comment=_leading_comment(m_start, lines),
             ))
         elif isinstance(member, (ast.Assign, ast.AnnAssign)):
             # class-level field declarations (dataclass-style attributes) --
@@ -140,7 +162,10 @@ def _chunk_class(node: ast.ClassDef, lines: list[str], repo: str, path: str) -> 
         # overview and aren't separately chunked -- a known, rare gap.
 
     overview_text = _render_spans(overview_spans, lines)
-    chunks.extend(_emit(repo, path, node.name, "class", class_start, class_end, overview_text))
+    chunks.extend(_emit(
+        repo, path, node.name, "class", class_start, class_end, overview_text,
+        leading_comment=_leading_comment(class_start, lines),
+    ))
     return chunks
 
 
@@ -164,6 +189,9 @@ def chunk_python_source(source: str, repo: str, path: str) -> list[CodeChunk]:
         symbol_type = _TOP_LEVEL_TYPE[type(node)]
         start_line, end_line = _line_span(node)
         text = "\n".join(lines[start_line - 1 : end_line])
-        chunks.extend(_emit(repo, path, node.name, symbol_type, start_line, end_line, text))
+        chunks.extend(_emit(
+            repo, path, node.name, symbol_type, start_line, end_line, text,
+            leading_comment=_leading_comment(start_line, lines),
+        ))
 
     return chunks

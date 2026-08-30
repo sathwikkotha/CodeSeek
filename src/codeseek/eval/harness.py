@@ -8,6 +8,7 @@ repo to look in, so narrowing the search to the known-correct repo would
 inflate recall relative to what a real query experiences.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from codeseek.embedding.service import EmbeddingService
@@ -53,7 +54,13 @@ def run_eval(
     model_keys: list[str],
     top_k: int = 10,
     reranker: Reranker | None = None,
+    query_expander: Callable[[str], str] | None = None,
 ) -> list[EvalResult]:
+    """query_expander (e.g. HydeQueryExpander.expand), if given, transforms
+    the question into what actually gets embedded for vector search -- the
+    original item.question is still what's passed to retriever.search's
+    query_text, so keyword/BM25 matching always sees the user's literal
+    words regardless of whether HyDE is in use for the vector leg."""
     retriever = HybridRetriever(store, reranker=reranker)
     results: list[EvalResult] = []
 
@@ -62,7 +69,8 @@ def run_eval(
         recall5, recall10, rr = [], [], []
 
         for item in ground_truth:
-            query_vector = embedding_service.embed_one(model_key, item.question)
+            embed_text = query_expander(item.question) if query_expander else item.question
+            query_vector = embedding_service.embed_one(model_key, embed_text)
             hits = retriever.search(collection, query_vector, item.question, top_k=top_k)
             ranked_ids = [h.id for h in hits]
             relevant_ids = {h.id for h in hits if _is_relevant(h.payload, item)}

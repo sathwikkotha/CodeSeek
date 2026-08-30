@@ -37,6 +37,7 @@ def _file_to_chunks(repo_path: Path, record: FileRecord, repo: RepoSpec) -> list
             ChunkPayload(
                 repo=c.repo, language=c.language, path=c.path, symbol_name=c.symbol_name,
                 symbol_type=c.symbol_type, start_line=c.start_line, end_line=c.end_line, text=c.text,
+                leading_comment=c.leading_comment,
             )
             for c in chunk_python_source(text, repo=repo.name, path=record.path)
         ]
@@ -46,6 +47,7 @@ def _file_to_chunks(repo_path: Path, record: FileRecord, repo: RepoSpec) -> list
             ChunkPayload(
                 repo=c.repo, language=c.language, path=c.path, symbol_name=c.symbol_name,
                 symbol_type=c.symbol_type, start_line=c.start_line, end_line=c.end_line, text=c.text,
+                leading_comment=c.leading_comment,
             )
             for c in chunk_js_ts_source(text, repo=repo.name, path=record.path, suffix=full_path.suffix)
         ]

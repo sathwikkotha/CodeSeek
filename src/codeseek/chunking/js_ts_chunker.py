@@ -36,6 +36,39 @@ class CodeChunk:
     start_line: int
     end_line: int
     text: str
+    leading_comment: str = ""
+
+
+def _leading_comment(start_line: int, lines: list[str]) -> str:
+    """The JSDoc/line-comment block immediately above `start_line` (1-indexed),
+    if any. tree-sitter's node span for a function/class/const starts at the
+    keyword itself -- a comment sitting right above it is a separate sibling
+    node, never part of the declaration's own span -- so without this, a
+    JSDoc block explaining what the function does is silently invisible to
+    both the chunk text and the embedding, exactly the gap Python's `ast`
+    chunker has for its own '#' comments."""
+    i = start_line - 2  # 0-indexed line directly above start_line
+
+    if i >= 0 and lines[i].strip().endswith("*/"):
+        block: list[str] = []
+        j = i
+        while j >= 0:
+            block.append(lines[j])
+            if lines[j].strip().startswith("/*"):
+                break
+            j -= 1
+        else:
+            return ""  # ran off the top of the file without finding the opening /*
+        block.reverse()
+        cleaned = [stripped for line in block if (stripped := line.strip().strip("/*").strip())]
+        return " ".join(cleaned)
+
+    collected: list[str] = []
+    while i >= 0 and lines[i].strip().startswith("//"):
+        collected.append(lines[i].strip().lstrip("/").strip())
+        i -= 1
+    collected.reverse()
+    return " ".join(c for c in collected if c)
 
 
 def _declarator_symbol(node: Node) -> tuple[str, str] | None:
@@ -110,11 +143,12 @@ def _emit(
     end_line = node.end_point[0] + 1
     node_lines = lines[start_line - 1 : end_line]
     text = "\n".join(node_lines)
+    leading_comment = _leading_comment(start_line, lines)
 
     if count_tokens(text) <= MAX_CHUNK_TOKENS:
         return [CodeChunk(
             repo=repo, language=language, path=path, symbol_name=symbol_name, symbol_type=symbol_type,
-            start_line=start_line, end_line=end_line, text=text,
+            start_line=start_line, end_line=end_line, text=text, leading_comment=leading_comment,
         )]
 
     packed = pack_units(node_lines, MAX_CHUNK_TOKENS, OVERSIZED_OVERLAP_RATIO, joiner="\n")
@@ -122,7 +156,7 @@ def _emit(
         CodeChunk(
             repo=repo, language=language, path=path, symbol_name=f"{symbol_name}#part{part_num}",
             symbol_type=symbol_type, start_line=start_line + rel_start, end_line=start_line + rel_end,
-            text=piece_text,
+            text=piece_text, leading_comment=leading_comment,
         )
         for part_num, (rel_start, rel_end, piece_text) in enumerate(packed, start=1)
     ]

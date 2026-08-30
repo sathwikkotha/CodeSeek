@@ -26,6 +26,31 @@ def test_merge_hits_keyword_only_hit_gets_floor_score_not_top_score():
     assert merged[0].id == "a"
 
 
+def test_merge_hits_keyword_only_hit_gets_bm25_scaled_score_when_query_text_given():
+    vector_hits = [
+        SearchHit(id="a", score=0.9, payload={"symbol_name": "a", "text": "def a(): pass"}),
+        SearchHit(id="b", score=0.5, payload={"symbol_name": "b", "text": "def b(): pass"}),
+    ]
+    # "c" is a strong lexical match (the query term appears many times);
+    # "d" barely matches at all -- BM25 should tell them apart instead of
+    # flattening both to the same floor score.
+    keyword_hits = [
+        SearchHit(id="c", score=0.0, payload={"symbol_name": "JWTBearer", "text": "jwt jwt jwt validate jwt token"}),
+        SearchHit(id="d", score=0.0, payload={"symbol_name": "unrelated", "text": "def unrelated(): pass"}),
+    ]
+
+    merged = {h.id: h for h in merge_hits(vector_hits, keyword_hits, top_k=10, query_text="jwt")}
+
+    # never outranks the strongest genuine semantic match, and never drops
+    # below the old flat floor either
+    assert merged["c"].score <= 0.9
+    assert merged["c"].score >= 0.5
+    assert merged["d"].score >= 0.5
+    # a real lexical match earns more than a near-zero one, unlike the old
+    # behavior where both would have landed at exactly 0.5
+    assert merged["c"].score > merged["d"].score
+
+
 def test_merge_hits_dedupes_and_marks_both():
     vector_hits = [SearchHit(id="a", score=0.9, payload={})]
     keyword_hits = [SearchHit(id="a", score=0.0, payload={})]
@@ -216,6 +241,63 @@ def test_rrf_fuse_prevents_reranker_from_burying_a_strong_pre_rerank_candidate()
 
     assert fused_ids[0] == "0"  # strong pre AND post rank still wins outright
     assert fused_ids.index(demoted.id) < 9  # demoted item survives, doesn't collapse to last
+
+
+def test_hybrid_retriever_routes_bare_identifier_query_straight_to_find_by_symbol():
+    store = QdrantStore(location=":memory:")
+    collection = "test_identifier_routing"
+    store.ensure_collection(collection, vector_size=3)
+
+    chunks = [_make_chunk("demo", "OptionInfo", "class OptionInfo: ...")]
+    store.upsert_chunks(collection, chunks, [[0.0, 0.0, 1.0]])  # deliberately far from the query vector below
+
+    retriever = HybridRetriever(store)
+    # query_vector points nowhere near OptionInfo's stored vector -- if this
+    # result came from cosine similarity it would score poorly or not be
+    # returned at all. It should still come back because the query text is a
+    # bare identifier and repo is known, so find_by_symbol short-circuits the
+    # embedding-based pipeline entirely.
+    results = retriever.search(collection, query_vector=[1.0, 0.0, 0.0], query_text="OptionInfo", top_k=5, repo="demo")
+
+    assert len(results) == 1
+    assert results[0].source == "symbol"
+    assert results[0].payload["symbol_name"] == "OptionInfo"
+
+
+def test_hybrid_retriever_natural_language_query_does_not_trigger_identifier_routing():
+    store = QdrantStore(location=":memory:")
+    collection = "test_no_identifier_routing"
+    store.ensure_collection(collection, vector_size=3)
+
+    chunks = [_make_chunk("demo", "OptionInfo", "class OptionInfo: ...")]
+    store.upsert_chunks(collection, chunks, [[1.0, 0.0, 0.0]])
+
+    retriever = HybridRetriever(store)
+    # a real natural-language question, not a bare identifier -- must go
+    # through the normal vector+keyword pipeline, not find_by_symbol.
+    results = retriever.search(
+        collection, query_vector=[1.0, 0.0, 0.0], query_text="how does typer represent an option",
+        top_k=5, repo="demo",
+    )
+
+    assert all(h.source != "symbol" for h in results)
+
+
+def test_hybrid_retriever_identifier_routing_falls_through_when_symbol_not_found():
+    store = QdrantStore(location=":memory:")
+    collection = "test_identifier_fallthrough"
+    store.ensure_collection(collection, vector_size=3)
+
+    chunks = [_make_chunk("demo", "SomeOtherName", "def SomeOtherName(): pass")]
+    store.upsert_chunks(collection, chunks, [[1.0, 0.0, 0.0]])
+
+    retriever = HybridRetriever(store)
+    # "retry" looks like a bare identifier but doesn't match any real symbol
+    # -- must fall through to the normal pipeline rather than returning nothing.
+    results = retriever.search(collection, query_vector=[1.0, 0.0, 0.0], query_text="retry", top_k=5, repo="demo")
+
+    assert len(results) == 1  # found via the normal vector/keyword path instead
+    assert results[0].source != "symbol"
 
 
 def test_hybrid_retriever_without_reranker_falls_back_to_merge_order():

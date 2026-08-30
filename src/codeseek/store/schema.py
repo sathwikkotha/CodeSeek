@@ -19,6 +19,7 @@ class ChunkPayload:
     start_line: int
     end_line: int
     text: str
+    leading_comment: str = ""
     license: str = ""
     stars: int = 0
 
@@ -31,7 +32,8 @@ class ChunkPayload:
             "repo": self.repo, "language": self.language, "path": self.path,
             "symbol_name": self.symbol_name, "symbol_type": self.symbol_type,
             "start_line": self.start_line, "end_line": self.end_line,
-            "text": self.text, "license": self.license, "stars": self.stars,
+            "text": self.text, "leading_comment": self.leading_comment,
+            "license": self.license, "stars": self.stars,
         }
 
 

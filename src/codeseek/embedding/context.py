@@ -35,4 +35,6 @@ def embedding_text(chunk: ChunkPayload) -> str:
 
     words = split_identifier(chunk.symbol_name)
     header = f"{chunk.symbol_type} {chunk.symbol_name} ({words}) in {chunk.path}"
+    if chunk.leading_comment:
+        header = f"{header}\n{chunk.leading_comment}"
     return f"{header}\n{chunk.text}"
