@@ -1,0 +1,37 @@
+name: Daily streak commit
+
+# Runs entirely on GitHub's own schedule -- independent of any local machine
+# or assistant session being active. Appends one line to .streak/log.txt so
+# there's always a real, small diff to commit, then pushes it back to main.
+on:
+  schedule:
+    - cron: "0 17 * * *"   # 17:00 UTC daily
+  workflow_dispatch: {}     # allows a manual "Run workflow" click to test it
+
+permissions:
+  contents: write
+
+jobs:
+  streak-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Append today's entry
+        run: |
+          mkdir -p .streak
+          echo "$(date -u +'%Y-%m-%d %H:%M UTC')" >> .streak/log.txt
+
+      - name: Commit and push
+        run: |
+          git config user.name "sathwikkotha"
+          git config user.email "sathwikkotha2003@gmail.com"
+          git add .streak/log.txt
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+            exit 0
+          fi
+          git commit -m "chore: daily streak log $(date -u +'%Y-%m-%d')"
+          git push
